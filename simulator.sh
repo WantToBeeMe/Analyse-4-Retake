@@ -6,9 +6,10 @@ echo "simulator starting"
 
 
 #the csv are made by me to test
-# wrong1 = duplication of name (still awaiting response of teacher if this is really wrong)
+# correct1 = a lot of stuff
+# correct2 = duplication of name (still awaiting response of teacher if this is really wrong)
+# wrong1 = non positive exection time
 # wrong2 = negative starting time
-# wrong3 = non positive exection time
 csvFile=""
 
 #checking if you enter in `-file`
@@ -45,16 +46,48 @@ fi
 #checkeing if the given file is corectly formatted. 
 # WORK IN PROGRESS
 # corectly formatted if    `name , startTime , processTime`
-# -> where name cant be duplicated                              #(should be asked to the teacher if this is needed / required)
 # -> where startTime should be an Int:  startTime >= 0          #time start at 0, so starting below that is not posible                         (should exist with error : `start time of $ is imposible`)
 # -> where processTime should be an Int:    processTime > 0     #you cant have a proces that doesnt take any time, then its not even a process  (should exist with error : `process time of $ is imposible`)
 
 
+ID=0  # Initialize counter
+incompatibleTime=false
 while IFS=',' read -r name start_time execution_time; do
-  
-    echo $name - $start_time - $execution_time
-   
+    
+    #BROOOOOOOO, WAAROM WILT DIE \n NIET WEG OMG, KRIJG ECHT TANTOE GROTE ZNOEN HIERVAN
+    execution_time=$(echo "$execution_time" | tr -d '\n')
+
+    if [ "$ID" -eq 0 ]; 
+    then
+        #the catagory names of the csv values, idk if whe should do anything with this
+        echo "$name, $start_time, $execution_time"
+    else
+        echo "$ID: $name-$start_time-$execution_time-"
+
+        if ! [[ "$start_time" =~ ^[0-9]+$ ]]; then #checking if starting time is really an int
+            echo "starting time of: $start_time is not a valid number"
+            incompatibleTime=true
+            break
+        elif ! [[ "$execution_time" =~ ^[0-9]+$ ]]; then # checking if execution time is really an int
+            echo "execution time of: $execution_time is not a valid number"
+            incompatibleTime=true
+            break
+        elif [ "$start_time" -lt 0 ]; then # checking if starting time is 0 or more
+            echo "starting time of: $start_time is not possible"
+            incompatibleTime=true
+            break
+        elif [ "$execution_time" -le 0 ]; then # checking if execution time is more then
+            echo "execution time of: $execution_time is not possible"
+            incompatibleTime=true
+            break
+        fi
+    fi
+
+    ((ID++))  # Increment counter
+
 done < "$csvFile"
+
+echo "finished with: $incompatibleTime"
 
 
 

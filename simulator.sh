@@ -4,13 +4,27 @@
 
 echo "simulator starting"
 
-
 #the csv are made by me to test
 # correct1 = a lot of stuff
 # correct2 = duplication of name (still awaiting response of teacher if this is really wrong)
 # wrong1 = non positive exection time
 # wrong2 = negative starting time
 csvFile=""
+queue_file="queue.txt"
+
+enqueue() {
+    echo "$1" >> "$queue_file"
+}
+dequeue() {
+    if [ -s "$queue_file" ]; then
+        first_line=$(head -n 1 "$queue_file")
+        sed -i '1d' "$queue_file"
+        echo "$first_line"
+    else
+        echo "Queue is empty."
+    fi
+}
+
 
 #checking if you enter in `-file`
 #if you dont enter `-file` the program will imidiatly stop with an error message: `Invallid argument $1`
@@ -52,10 +66,10 @@ fi
 
 ID=0  # Initialize counter
 incompatibleTime=false
-while IFS=',' read -r name start_time execution_time; do
-    
-    #BROOOOOOOO, WAAROM WILT DIE \n NIET WEG OMG, KRIJG ECHT TANTOE GROTE ZNOEN HIERVAN
-    execution_time=$(echo "$execution_time" | tr -d '\n')
+
+
+#while IFS="," read -r name start_time execution_time; do
+while read -r name start_time execution_time; do
 
     if [ "$ID" -eq 0 ]; 
     then
@@ -81,19 +95,18 @@ while IFS=',' read -r name start_time execution_time; do
             incompatibleTime=true
             break
         fi
+        enqueue "$start_time,$name,$execution_time"
+        echo "Enqueued: $name ($ID)"
     fi
 
     ((ID++))  # Increment counter
-
-done < "$csvFile"
+done < $csvFile
 
 echo "finished with: $incompatibleTime"
 
 
-
-
-
-
+# Remove the queue file once all tasks are processed
+rm "$queue_file"
 
 
 # the assignment in a nutshel 
@@ -130,5 +143,4 @@ echo "finished with: $incompatibleTime"
 #        t=4
 # P1 is using the CPU
 # Procces P1 terminated
-
 # note that the t=0, t=1, t=n shoudnt be printed, its just here for clarity

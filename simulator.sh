@@ -3,28 +3,59 @@
 #.. .. ..
 
 echo "simulator starting"
-
-#the csv are made by me to test
-# correct1 = a lot of stuff
-# correct2 = duplication of name (still awaiting response of teacher if this is really wrong)
-# wrong1 = non positive exection time
-# wrong2 = negative starting time
 csvFile=""
-queue_file="queue.txt"
+queueFile="ready_queue.txt"
+arivalFile="to_be_arived.txt"
 
+queueFileCreated=false
 enqueue() {
-    echo "$1" >> "$queue_file"
+    echo "$1" >> "$queueFile"
+    queueFileCreated=true
 }
+#task=$(dequeue)
 dequeue() {
-    if [ -s "$queue_file" ]; then
-        first_line=$(head -n 1 "$queue_file")
-        sed -i '1d' "$queue_file"
-        echo "$first_line"
+    if [ -s "$queueFile" ]; then
+        first_line=$(head -n 1 "$queueFile")
+        sed -i '1d' "$queueFile"
+        echo "$queueFile"
     else
         echo "Queue is empty."
     fi
 }
 
+#functionst that handel the arival File, this files containts all the proceses that havent arived yet (they cant be in the queue yet, becasue they obviously didnt arive)
+#every Quantum the function `$(enqueueReadyArivals "$Quantum")` should be called to let proceses arive that should arive
+arivalFileCreated=false
+setArival(){
+    echo "$1" >> "$arivalFile"
+    arivalFileCreated=true
+}
+enqueueReadyArivals(){
+    lineIndex=1
+    movedOver=0
+    if [ "$arivalFileCreated" = true ]; then
+        #while IFS="," read -r name start_time execution_time windows_test; do
+        while IFS="," read -r name start_time execution_time; do
+            if [ "$1" = "$start_time" ]; then
+                enqueue "$name,$execution_time"
+                #enqueue "$name,$execution_time,windows_test"
+                sed -i "$((lineIndex - movedOver))d" "$arivalFile"
+                ((movedOver++))
+            fi
+            ((lineIndex++))
+        done < $arivalFile
+    fi
+}
+
+stopSimulation(){
+    # Remove the queue file once all tasks are processed
+    if [ "$queueFileCreated" = true ]; then 
+        rm "$queueFile"
+    fi
+    if [ "$arivalFileCreated" = true ]; then
+        rm "$arivalFile"
+    fi
+}
 
 #checking if you enter in `-file`
 #if you dont enter `-file` the program will imidiatly stop with an error message: `Invallid argument $1`
@@ -56,61 +87,56 @@ if [ ! -f "$csvFile" ]; then
     exit 1
 fi
 
+#checking if the file is correctly formatted, and copying it over so we dont make any changes to this csv
+firstIterationDone=false
+while IFS="," read -r name start_time execution_time; do
+#while IFS="," read -r name start_time execution_time windows_test; do
 
-#checkeing if the given file is corectly formatted. 
-# WORK IN PROGRESS
-# corectly formatted if    `name , startTime , processTime`
-# -> where startTime should be an Int:  startTime >= 0          #time start at 0, so starting below that is not posible                         (should exist with error : `start time of $ is imposible`)
-# -> where processTime should be an Int:    processTime > 0     #you cant have a proces that doesnt take any time, then its not even a process  (should exist with error : `process time of $ is imposible`)
-
-
-ID=0  # Initialize counter
-incompatibleTime=false
-
-
-#while IFS="," read -r name start_time execution_time; do
-while read -r name start_time execution_time; do
-
-    if [ "$ID" -eq 0 ]; 
-    then
+    if [ "$firstIterationDone" = false ]; then
         #the catagory names of the csv values, idk if whe should do anything with this
         echo "$name, $start_time, $execution_time"
+        
     else
-        echo "$ID: $name-$start_time-$execution_time-"
-
         if ! [[ "$start_time" =~ ^[0-9]+$ ]]; then #checking if starting time is really an int
             echo "starting time of: $start_time is not a valid number"
-            incompatibleTime=true
-            break
+            $(stopSimulation)
+            exit 1
         elif ! [[ "$execution_time" =~ ^[0-9]+$ ]]; then # checking if execution time is really an int
             echo "execution time of: $execution_time is not a valid number"
-            incompatibleTime=true
-            break
+            $(stopSimulation)
+            exit 1
         elif [ "$start_time" -lt 0 ]; then # checking if starting time is 0 or more
             echo "starting time of: $start_time is not possible"
-            incompatibleTime=true
-            break
+            $(stopSimulation)
+            exit 1
         elif [ "$execution_time" -le 0 ]; then # checking if execution time is more then
             echo "execution time of: $execution_time is not possible"
-            incompatibleTime=true
-            break
+            $(stopSimulation)
+            exit 1
         fi
-        enqueue "$start_time,$name,$execution_time"
-        echo "Enqueued: $name ($ID)"
+        #setArival "$name,$start_time,$execution_time,windows_test"
+        setArival "$name,$start_time,$execution_time"
     fi
-
-    ((ID++))  # Increment counter
+    firstIterationDone=true
 done < $csvFile
 
-echo "finished with: $incompatibleTime"
+Quantum=0
+while true; do
+    #this instead should check if the arival and the queue files are empty
+    if [ "$Quantum" -eq 10 ]; then
+        break
+    fi
+
+    $(enqueueReadyArivals "$Quantum")
+    ((Quantum++))
+done
 
 
-# Remove the queue file once all tasks are processed
-rm "$queue_file"
+#$(stopSimulation)
+
 
 
 # the assignment in a nutshel 
-
 # this simulation will simule the Round Robin Algorithm        (note: quantum is a tiny time period)
 # (each proces uses the CPU for a quantum and then its added to the back of the queue again, untill it has had enough quantums that its done) 
 # when done, its execution time is then permanently removed from the scheduling 

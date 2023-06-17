@@ -6,40 +6,29 @@ echo "simulator starting"
 csvFile=""
 queueFile="ready_queue.txt"
 arivalFile="to_be_arived.txt"
-queueAgainFile="queue_again.txt"
 
 queueFileCreated=false
 enqueue() {
     queueFileCreated=true
     echo "$1" >> "$queueFile"
 }
-#task=$(dequeue)
+
 dequeue() {
-    if [ ! -f "$queueFile" ]; then
-        echo "no queue found"
+    #thsi checks if the file existst, all teh FileCreated booleans should be deleted and the deleted function should use this instead
+    if [ "$queueFileCreated" = true ]; then
+        echo "none"
     elif [ -s "$queueFile" ]; then
         first_line=$(head -n 1 "$queueFile")
         sed -i '1d' "$queueFile"
         #IFS=',' read -r name remaining_time windows_test <<< "$first_line"
         IFS=',' read -r name remaining_time <<< "$first_line"
         new_time=$((remaining_time - 1))
-        if [ "$new_time" -gt 0 ]; then
-            #setQueueAgain "$name,$new_time,$windows_test"
-            setQueueAgain "$name,$new_time"
-            echo "$name is using the CPU"
-        else
-            echo "$name is using the CPU"
-            echo "Process $name terminated"
-        fi
+        #echo "$name,$new_time,$windows_test"
+        echo "$name,$new_time"
     else
-        echo "empty queue"
+        echo "none"
     fi
-}
-
-dequeueAll() {
-    while [ -s "$queueFile" ]; do
-        dequeue
-    done
+    return 0
 }
 
 #functionst that handel the arival File, this files containts all the proceses that havent arived yet (they cant be in the queue yet, becasue they obviously didnt arive)
@@ -52,7 +41,7 @@ setArival(){
 enqueueReadyArivals(){
     lineIndex=1
     movedOver=0
-    if [ "$arivalFileCreated" = true ] && [ -f "$arivalFile" ]; then
+    if [ "$arivalFileCreated" = true ]; then
         #while IFS="," read -r name start_time execution_time windows_test; do
         while IFS="," read -r name start_time execution_time; do
             if [ "$1" = "$start_time" ]; then
@@ -66,21 +55,6 @@ enqueueReadyArivals(){
     fi
 }
 
-queueAgainFileCreated=false
-setQueueAgain(){
-    queueAgainFileCreated=true
-    echo "$1" >> "$queueAgainFile"
-}
-enqueueAgainQueue() {
-    if [ -f "$queueAgainFile" ]; then
-        while IFS= read -r line; do
-            enqueue "$line"
-        done < "$queueAgainFile"
-        # Clear the file
-        > "$queueAgainFile"
-    fi
-}
-
 
 stopSimulation(){
     # Remove the queue file once all tasks are processed
@@ -90,10 +64,6 @@ stopSimulation(){
 
      if [ "$queueFileCreated" = true ]; then 
         rm "$queueFile"
-     fi
-   
-     if [ "$queueAgainFileCreated" = true ]; then
-        rm "$queueAgainFile"
      fi
 }
 
@@ -161,61 +131,36 @@ while IFS="," read -r name start_time execution_time; do
 done < $csvFile
 
 Quantum=0
+previouslyDequeued="none"
 while true; do
-    #this instead should check if the arival and the queue files are empty
-    echo "$Quantum"
-    if [ "$Quantum" -eq 10 ]; then
+    if [ -s "$QueueFile" ] && [ -s "$arivalFile" ]; then #this should work, it doesnt for windows though
+    #if [ "$Quantum" -eq 15 ]; then
+        echo "stoped the simulation at $Quantum"
         break
     fi
-    $(enqueueReadyArivals "$Quantum") #add all new arivals to the queue 
-    $(enqueueAgainQueue) #adds all tasks that werent done yet to the queue
 
-    task=$(dequeueAll)
-    echo "$task"
+    #each quantum these steps should be done
+    #step 1: check for arivals, add to queue
+    $(enqueueReadyArivals "$Quantum")
+    #step 2: check for previous dequeued if it needs requeuing, else print the termination
+    if [ "$previouslyDequeued" != "none" ]; then
+        $(enqueue "$previouslyDequeued")
+    fi
+    #step 3, dequeue a new one
+    previouslyDequeued=$(dequeue)
+
+    if [ "$previouslyDequeued" != "none" ]; then
+        #IFS=',' read -r name new_time windows_test <<< "$previouslyDequeued"
+        IFS=',' read -r name new_time <<< "$previouslyDequeued"
+        echo "$name is using the CPU"
+        if [ ! "$new_time" -gt 0 ]; then 
+            echo "Process $name terminated"
+            previouslyDequeued="none"
+        fi
+    fi
 
     ((Quantum++))
 done
 
-
 $(stopSimulation)
 
-
-
-# the assignment in a nutshel 
-# this simulation will simule the Round Robin Algorithm        (note: quantum is a tiny time period)
-# (each proces uses the CPU for a quantum and then its added to the back of the queue again, untill it has had enough quantums that its done) 
-# when done, its execution time is then permanently removed from the scheduling 
-#
-# you will have several "fake processes" to schedule
-# this program should decide when one of the "fake processes" needs to run
-# each ëxecition"time for each quantum will be represented only from a printout (afther the print it will continue with the next running process)
-#
-# for example the following data
-#      t = time in quantums
-#     start t = time that the proces arives at cp (so when it should start (at witch queantum it should start))
-#     execution t = the amount of quantums it takes for it to finish
-#  Proces Name | Start t | execution t 
-#      P1      |    0    |     4         #should start imidiatly, and take 4 quantums to finish
-#      P2      |    1    |     2
-#      P3      |    3    |     1         #should start at the 3th quantum, but finish imidiatly (because it only needs 1 quantum)
-#   
-
-# q=0:  P1 is using the CPU
-#
-# q=1:  P2 is using the CPU
-#       P1 is using the CPU
-# 
-# q=2:  P2 is using the CPU             ?? where dit P1 go ??
-#       Process P2 terminated           
-#      
-# q=3:  p3 is using the CPU
-#       Process P3 terminated
-#       P1 is using the CPU
-#      
-# q=4:  P1 is using the CPU
-#       Procces P1 terminated
-#==============================
-# q0    q1    q2    q3    q4
-# 1     2,1   2     3,1   1
-
-#bruh, this is fucking incoreect lol,, how are we supose to match to an incorect output

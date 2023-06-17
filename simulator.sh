@@ -6,39 +6,58 @@ echo "simulator starting"
 csvFile=""
 queueFile="ready_queue.txt"
 arivalFile="to_be_arived.txt"
+queueAgainFile="queue_again.txt"
 
 queueFileCreated=false
 enqueue() {
-    echo "$1" >> "$queueFile"
     queueFileCreated=true
+    echo "$1" >> "$queueFile"
 }
 #task=$(dequeue)
 dequeue() {
-    if [ -s "$queueFile" ]; then
+    if [ ! -f "$queueFile" ]; then
+        echo "no queue found"
+    elif [ -s "$queueFile" ]; then
         first_line=$(head -n 1 "$queueFile")
         sed -i '1d' "$queueFile"
-        echo "$queueFile"
+        #IFS=',' read -r name remaining_time windows_test <<< "$first_line"
+        IFS=',' read -r name remaining_time <<< "$first_line"
+        new_time=$((remaining_time - 1))
+        if [ "$new_time" -gt 0 ]; then
+            #setQueueAgain "$name,$new_time,$windows_test"
+            setQueueAgain "$name,$new_time"
+            echo "$name is using the CPU"
+        else
+            echo "$name is using the CPU"
+            echo "Process $name terminated"
+        fi
     else
-        echo "Queue is empty."
+        echo "empty queue"
     fi
+}
+
+dequeueAll() {
+    while [ -s "$queueFile" ]; do
+        dequeue
+    done
 }
 
 #functionst that handel the arival File, this files containts all the proceses that havent arived yet (they cant be in the queue yet, becasue they obviously didnt arive)
 #every Quantum the function `$(enqueueReadyArivals "$Quantum")` should be called to let proceses arive that should arive
 arivalFileCreated=false
 setArival(){
-    echo "$1" >> "$arivalFile"
     arivalFileCreated=true
+    echo "$1" >> "$arivalFile"
 }
 enqueueReadyArivals(){
     lineIndex=1
     movedOver=0
-    if [ "$arivalFileCreated" = true ]; then
+    if [ "$arivalFileCreated" = true ] && [ -f "$arivalFile" ]; then
         #while IFS="," read -r name start_time execution_time windows_test; do
         while IFS="," read -r name start_time execution_time; do
             if [ "$1" = "$start_time" ]; then
-                enqueue "$name,$execution_time"
                 #enqueue "$name,$execution_time,windows_test"
+                enqueue "$name,$execution_time"
                 sed -i "$((lineIndex - movedOver))d" "$arivalFile"
                 ((movedOver++))
             fi
@@ -47,14 +66,35 @@ enqueueReadyArivals(){
     fi
 }
 
+queueAgainFileCreated=false
+setQueueAgain(){
+    queueAgainFileCreated=true
+    echo "$1" >> "$queueAgainFile"
+}
+enqueueAgainQueue() {
+    if [ -f "$queueAgainFile" ]; then
+        while IFS= read -r line; do
+            enqueue "$line"
+        done < "$queueAgainFile"
+        # Clear the file
+        > "$queueAgainFile"
+    fi
+}
+
+
 stopSimulation(){
     # Remove the queue file once all tasks are processed
-    if [ "$queueFileCreated" = true ]; then 
-        rm "$queueFile"
-    fi
-    if [ "$arivalFileCreated" = true ]; then
+     if [ "$arivalFileCreated" = true ]; then
         rm "$arivalFile"
-    fi
+     fi
+
+     if [ "$queueFileCreated" = true ]; then 
+        rm "$queueFile"
+     fi
+   
+     if [ "$queueAgainFileCreated" = true ]; then
+        rm "$queueAgainFile"
+     fi
 }
 
 #checking if you enter in `-file`
@@ -89,8 +129,8 @@ fi
 
 #checking if the file is correctly formatted, and copying it over so we dont make any changes to this csv
 firstIterationDone=false
-while IFS="," read -r name start_time execution_time; do
 #while IFS="," read -r name start_time execution_time windows_test; do
+while IFS="," read -r name start_time execution_time; do
 
     if [ "$firstIterationDone" = false ]; then
         #the catagory names of the csv values, idk if whe should do anything with this
@@ -123,16 +163,21 @@ done < $csvFile
 Quantum=0
 while true; do
     #this instead should check if the arival and the queue files are empty
+    echo "$Quantum"
     if [ "$Quantum" -eq 10 ]; then
         break
     fi
+    $(enqueueReadyArivals "$Quantum") #add all new arivals to the queue 
+    $(enqueueAgainQueue) #adds all tasks that werent done yet to the queue
 
-    $(enqueueReadyArivals "$Quantum")
+    task=$(dequeueAll)
+    echo "$task"
+
     ((Quantum++))
 done
 
 
-#$(stopSimulation)
+$(stopSimulation)
 
 
 
@@ -153,20 +198,24 @@ done
 #      P1      |    0    |     4         #should start imidiatly, and take 4 quantums to finish
 #      P2      |    1    |     2
 #      P3      |    3    |     1         #should start at the 3th quantum, but finish imidiatly (because it only needs 1 quantum)
-#    
-#        t=0 
-# P1 is using the CPU
-#        t=1
-# P2 is using the CPU
-# P1 is using the CPU
-#        t=2
-# P2 is using the CPU
-# Process P2 terminated
-#        t=3
-# p3 is using the CPU
-# Process P3 terminated
-# P1 is using the CPU
-#        t=4
-# P1 is using the CPU
-# Procces P1 terminated
-# note that the t=0, t=1, t=n shoudnt be printed, its just here for clarity
+#   
+
+# q=0:  P1 is using the CPU
+#
+# q=1:  P2 is using the CPU
+#       P1 is using the CPU
+# 
+# q=2:  P2 is using the CPU             ?? where dit P1 go ??
+#       Process P2 terminated           
+#      
+# q=3:  p3 is using the CPU
+#       Process P3 terminated
+#       P1 is using the CPU
+#      
+# q=4:  P1 is using the CPU
+#       Procces P1 terminated
+#==============================
+# q0    q1    q2    q3    q4
+# 1     2,1   2     3,1   1
+
+#bruh, this is fucking incoreect lol,, how are we supose to match to an incorect output

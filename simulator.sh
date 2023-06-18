@@ -1,8 +1,7 @@
 #!/bin/bash
 #1031349 Dirk Roosendaal
-#.. .. ..
+#1034335 Yvonne Maan
 
-echo "simulator starting"
 csvFile=""
 queueFile="ready_queue.txt"
 arivalFile="to_be_arived.txt"
@@ -58,13 +57,8 @@ enqueueReadyArivals(){
 
 stopSimulation(){
     # Remove the queue file once all tasks are processed
-     if [ "$arivalFileCreated" = true ]; then
-        rm "$arivalFile"
-     fi
-
-     if [ "$queueFileCreated" = true ]; then 
-        rm "$queueFile"
-     fi
+    rm $arivalFile
+    rm $queueFile
 }
 
 #checking if you enter in `-file`
@@ -104,7 +98,8 @@ while IFS="," read -r name start_time execution_time; do
 
     if [ "$firstIterationDone" = false ]; then
         #the catagory names of the csv values, idk if whe should do anything with this
-        echo "$name, $start_time, $execution_time"
+        #echo "$name, $start_time, $execution_time"
+        echo ""
         
     else
         if ! [[ "$start_time" =~ ^[0-9]+$ ]]; then #checking if starting time is really an int
@@ -133,8 +128,7 @@ done < $csvFile
 Quantum=0
 previouslyDequeued="none"
 while true; do
-    if [ -s "$QueueFile" ] && [ -s "$arivalFile" ]; then #this should work, it doesnt for windows though
-    #if [ "$Quantum" -eq 15 ]; then
+    if [ ! -s $queueFile ] && [ ! -s $arivalFile ] && [ $Quantum -gt 1 ]; then
         echo "stoped the simulation at $Quantum"
         break
     fi

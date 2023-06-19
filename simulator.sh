@@ -43,7 +43,7 @@ enqueueReadyArivals(){
     movedOver=0
  
     while IFS="," read -r name start_time execution_time; do
-        if [ "$1" = "$start_time" ]; then
+        if [ "$1" = "$start_time" ]; then #if the quantum ($1) is the same as the start_time, then add it in to the queue, (without the start_time, you dont need the start_time insde the queue anymore)
             enqueue "$name,$execution_time"
             sed -i "$((lineIndex - movedOver))d" "$arivalFile"
             ((movedOver++))
@@ -143,7 +143,7 @@ while true; do
     fi
     #step 3, dequeue a new one
     previouslyDequeued=$(dequeue)
-    #step 4, print what is running to the user
+    #step 4, print what is happening to the user
     if [ "$previouslyDequeued" != "none" ]; then
         
         IFS=',' read -r name new_time <<< "$previouslyDequeued"

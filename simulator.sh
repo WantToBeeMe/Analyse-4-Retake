@@ -2,21 +2,21 @@
 #1031349 Dirk Roosendaal
 #1034335 Yvonne Maan
 
+
 csvFile=""
 queueFile="ready_queue.txt"
 arivalFile="to_be_arived.txt"
 
-queueFileCreated=false
-enqueue() {
-    queueFileCreated=true
+# method for: add processes to the end of the queueFile (returns nothing)
+enqueue() { 
     echo "$1" >> "$queueFile"
 }
 
+# method for: taking/returning the head process of the queue
+# detials:    it also subtracts 1 execution time because that has been completed (in this quantum), 
+#             then it returns this process (or "none" if there is no task)
 dequeue() {
-    #thsi checks if the file existst, all teh FileCreated booleans should be deleted and the deleted function should use this instead
-    if [ "$queueFileCreated" = true ]; then
-        echo "none"
-    elif [ -s "$queueFile" ]; then
+    if [ -s "$queueFile" ]; then
         first_line=$(head -n 1 "$queueFile")
         sed -i '1d' "$queueFile"
         #IFS=',' read -r name remaining_time windows_test <<< "$first_line"
@@ -30,36 +30,35 @@ dequeue() {
     return 0
 }
 
-#functionst that handel the arival File, this files containts all the proceses that havent arived yet (they cant be in the queue yet, becasue they obviously didnt arive)
-#every Quantum the function `$(enqueueReadyArivals "$Quantum")` should be called to let proceses arive that should arive
-arivalFileCreated=false
+# method for: adding processes to the arival File, this files containts all the proceses that havent arived yet 
+# details:    we are using a sperate file for this isntead of the given file of the user, thatway we can remove any arrived processes from this file
+#             (they obviously cant be added to the queue imidiatly if they didnt arive yet)   (returns nothing)
 setArival(){
-    arivalFileCreated=true
     echo "$1" >> "$arivalFile"
 }
+
+# method for: adding all processes arived processes to the queue
+# details:    if the arival start_time matches the given quantum, then it adds it
+#             it also removes the starting time because thats not needed anymore inside queue
+#             (returns nothing)
 enqueueReadyArivals(){
     lineIndex=1
     movedOver=0
-    if [ "$arivalFileCreated" = true ]; then
-        #while IFS="," read -r name start_time execution_time windows_test; do
-        while IFS="," read -r name start_time execution_time; do
-            if [ "$1" = "$start_time" ]; then
-                #enqueue "$name,$execution_time,windows_test"
-                enqueue "$name,$execution_time"
-                sed -i "$((lineIndex - movedOver))d" "$arivalFile"
-                ((movedOver++))
-            fi
-            ((lineIndex++))
-        done < $arivalFile
-    fi
+ 
+    #while IFS="," read -r name start_time execution_time windows_test; do
+    while IFS="," read -r name start_time execution_time; do
+        if [ "$1" = "$start_time" ]; then
+            #enqueue "$name,$execution_time,windows_test"
+            enqueue "$name,$execution_time"
+            sed -i "$((lineIndex - movedOver))d" "$arivalFile"
+            ((movedOver++))
+        fi
+        ((lineIndex++))
+    done < $arivalFile
 }
 
 
-stopSimulation(){
-    # Remove the queue file once all tasks are processed
-    rm $arivalFile
-    rm $queueFile
-}
+
 
 #checking if you enter in `-file`
 #if you dont enter `-file` the program will imidiatly stop with an error message: `Invallid argument $1`
@@ -93,30 +92,30 @@ fi
 
 #checking if the file is correctly formatted, and copying it over so we dont make any changes to this csv
 firstIterationDone=false
+touch "$arivalFile"
 #while IFS="," read -r name start_time execution_time windows_test; do
 while IFS="," read -r name start_time execution_time; do
 
     if [ "$firstIterationDone" = false ]; then
-        #the catagory names of the csv values, idk if whe should do anything with this
-        #echo "$name, $start_time, $execution_time"
+        #the first iteration will be skipped because in csv the first line / head is always the different names of the different columbs
         echo ""
         
     else
         if ! [[ "$start_time" =~ ^[0-9]+$ ]]; then #checking if starting time is really an int
             echo "starting time of: $start_time is not a valid number"
-            $(stopSimulation)
+            rm $arivalFile
             exit 1
         elif ! [[ "$execution_time" =~ ^[0-9]+$ ]]; then # checking if execution time is really an int
             echo "execution time of: $execution_time is not a valid number"
-            $(stopSimulation)
+            rm $arivalFile
             exit 1
         elif [ "$start_time" -lt 0 ]; then # checking if starting time is 0 or more
             echo "starting time of: $start_time is not possible"
-            $(stopSimulation)
+            rm $arivalFile
             exit 1
         elif [ "$execution_time" -le 0 ]; then # checking if execution time is more then
             echo "execution time of: $execution_time is not possible"
-            $(stopSimulation)
+            rm $arivalFile
             exit 1
         fi
         #setArival "$name,$start_time,$execution_time,windows_test"
@@ -125,11 +124,18 @@ while IFS="," read -r name start_time execution_time; do
     firstIterationDone=true
 done < $csvFile
 
+
+
+# from here the "CPU" starts running, this loop simulates that
+# every iteration of the loop is a Quantum
 Quantum=0
 previouslyDequeued="none"
+touch "$queueFile"
 while true; do
-    if [ ! -s $queueFile ] && [ ! -s $arivalFile ] && [ $Quantum -gt 1 ]; then
-        echo "stoped the simulation at $Quantum"
+    if [ ! -s $queueFile ] && [ ! -s $arivalFile ] && [ $Quantum -gt 0 ] && [ "$previouslyDequeued" == "none" ]; then
+        #echo "stoped the simulation at Quantum: $Quantum"
+        rm $arivalFile
+        rm $queueFile
         break
     fi
 
@@ -142,7 +148,7 @@ while true; do
     fi
     #step 3, dequeue a new one
     previouslyDequeued=$(dequeue)
-
+    #step 4, print what is running to the user
     if [ "$previouslyDequeued" != "none" ]; then
         #IFS=',' read -r name new_time windows_test <<< "$previouslyDequeued"
         IFS=',' read -r name new_time <<< "$previouslyDequeued"
@@ -151,10 +157,11 @@ while true; do
             echo "Process $name terminated"
             previouslyDequeued="none"
         fi
+    else
+        echo "idle"
     fi
 
     ((Quantum++))
 done
 
-$(stopSimulation)
 

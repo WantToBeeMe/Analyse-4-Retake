@@ -1,6 +1,5 @@
 #!/bin/bash
-#1031349 Dirk Roosendaal
-#1034335 Yvonne Maan
+#1031349 Dirk Roosendaal - 1034335 Yvonne Maan
 
 
 csvFile=""
@@ -19,10 +18,8 @@ dequeue() {
     if [ -s "$queueFile" ]; then
         first_line=$(head -n 1 "$queueFile")
         sed -i '1d' "$queueFile"
-        #IFS=',' read -r name remaining_time windows_test <<< "$first_line"
         IFS=',' read -r name remaining_time <<< "$first_line"
         new_time=$((remaining_time - 1))
-        #echo "$name,$new_time,$windows_test"
         echo "$name,$new_time"
     else
         echo "none"
@@ -45,10 +42,8 @@ enqueueReadyArivals(){
     lineIndex=1
     movedOver=0
  
-    #while IFS="," read -r name start_time execution_time windows_test; do
     while IFS="," read -r name start_time execution_time; do
         if [ "$1" = "$start_time" ]; then
-            #enqueue "$name,$execution_time,windows_test"
             enqueue "$name,$execution_time"
             sed -i "$((lineIndex - movedOver))d" "$arivalFile"
             ((movedOver++))
@@ -93,7 +88,7 @@ fi
 #checking if the file is correctly formatted, and copying it over so we dont make any changes to this csv
 firstIterationDone=false
 touch "$arivalFile"
-#while IFS="," read -r name start_time execution_time windows_test; do
+
 while IFS="," read -r name start_time execution_time; do
 
     if [ "$firstIterationDone" = false ]; then
@@ -118,7 +113,7 @@ while IFS="," read -r name start_time execution_time; do
             rm $arivalFile
             exit 1
         fi
-        #setArival "$name,$start_time,$execution_time,windows_test"
+        
         setArival "$name,$start_time,$execution_time"
     fi
     firstIterationDone=true
@@ -150,7 +145,7 @@ while true; do
     previouslyDequeued=$(dequeue)
     #step 4, print what is running to the user
     if [ "$previouslyDequeued" != "none" ]; then
-        #IFS=',' read -r name new_time windows_test <<< "$previouslyDequeued"
+        
         IFS=',' read -r name new_time <<< "$previouslyDequeued"
         echo "$name is using the CPU"
         if [ ! "$new_time" -gt 0 ]; then 
